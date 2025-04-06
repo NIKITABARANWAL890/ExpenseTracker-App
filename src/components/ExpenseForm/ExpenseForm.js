@@ -7,45 +7,43 @@ const ExpenseForm = ({ addExpense, updateExpense, newExpense }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editId, setEditId] = useState(null);
 
-useEffect(() => {
-  if (newExpense) {
-    expenseTextInput.current.value = newExpense.text;
-    expenseAmountInput.current.value = newExpense.amount;
-    expenseTextInput.current.focus();  
-    setIsEditing(true);
-    setEditId(newExpense.id);
-  }
-}, [newExpense]);
+  useEffect(() => {
+    if (newExpense) {
+      expenseTextInput.current.value = newExpense.text;
+      expenseAmountInput.current.value = newExpense.amount;
+      setEditId(newExpense.id);
+      setIsEditing(true);
+      expenseTextInput.current.focus();
+    }
+  }, [newExpense]);
 
+  const clearInputs = () => {
+    expenseTextInput.current.value = "";
+    expenseAmountInput.current.value = "";
+  };
 
   const onSubmitHandler = (e) => {
     e.preventDefault();
+    const text = expenseTextInput.current.value;
+    const amount = expenseAmountInput.current.value;
 
-    const expenseText = expenseTextInput.current.value;
-    const expenseAmount = expenseAmountInput.current.value;
-
-    if (parseInt(expenseAmount) === 0) return;
+    if (parseInt(amount) === 0) return;
 
     const expense = {
-      text: expenseText,
-      amount: expenseAmount,
-      id: isEditing ? editId : new Date().getTime()
+      text,
+      amount,
+      id: isEditing ? editId : new Date().getTime().toString(),
     };
 
     if (isEditing) {
-      updateExpense(expense);  
+      updateExpense(expense);
     } else {
-      addExpense(expense);   
+      addExpense(expense);
     }
 
-    clearInput();
     setIsEditing(false);
     setEditId(null);
-  };
-
-  const clearInput = () => {
-    expenseAmountInput.current.value = "";
-    expenseTextInput.current.value = "";
+    clearInputs();
   };
 
   return (

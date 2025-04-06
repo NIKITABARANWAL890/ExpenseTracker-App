@@ -1,90 +1,121 @@
-import { useState, useReducer } from "react";
+import { useReducer, useEffect } from "react";
 import ExpenseForm from "./components/ExpenseForm/ExpenseForm";
 import ExpenseInfo from "./components/ExpenseInfo/ExpenseInfo";
 import ExpenseList from "./components/ExpenseList/ExpenseList";
 import "./App.css";
+import { db } from "./firebaseinit";
+import { collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc } from "firebase/firestore";
 
 const reducer = (state, action) => {
   const { payload } = action;
   switch (action.type) {
-    case "ADD_EXPENSE": {
-      return {
-        expenses: [payload.expense, ...state.expenses]
-      };
-    }
-    case "REMOVE_EXPENSE": {
-      return {
-        expenses: state.expenses.filter((expense) => expense.id !== payload.id)
-      };
-    }
-    //add logic for updating the expense here
-    case "EDIT_EXPENSE": {
-      console.log('Editable transaction clicked');
-      const tran = state.expenses.findIndex((expense) => expense.id === payload.id);
-      console.log(tran);
-      console.log(state.expenses[tran]);
-    
-      return {
-        ...state, // Keep the existing state
-        newExpense: state.expenses[tran] // Set the expense to be edited
-      };
-    }
+    case "ADD_EXPENSE":
+      return { ...state, expenses: [payload.expense, ...state.expenses] };
 
-    case "UPDATE_EXPENSE": {
-      const updatedExpenses = state.expenses.map((exp) =>
-        exp.id === payload.expense.id ? payload.expense : exp
-      );
+    case "REMOVE_EXPENSE":
       return {
         ...state,
-        expenses: updatedExpenses,
-        newExpense: null, // Clear current edit
+        expenses: state.expenses.filter((expense) => expense.id !== payload.id),
       };
-    }
-    
-    
-    
+
+    case "EDIT_EXPENSE":
+      const index = state.expenses.findIndex((e) => e.id === payload.id);
+      return {
+        ...state,
+        newExpense: state.expenses[index],
+      };
+
+    case "UPDATE_EXPENSE":
+      return {
+        ...state,
+        expenses: state.expenses.map((e) =>
+          e.id === payload.expense.id ? payload.expense : e
+        ),
+        newExpense: null,
+      };
+
+    case "SET":
+      return { ...state, expenses: payload.expenses };
+
     default:
       return state;
   }
 };
-// Use proper state management for populating the form in the expenseForm component on clicking the edit icon in the Transaction component
+
 function App() {
-  const [state, dispatch] = useReducer(reducer, { expenses: [] });
+  const [state, dispatch] = useReducer(reducer, {
+    expenses: [],
+    newExpense: null,
+  });
 
-  const addExpense = (expense) => {
-    dispatch({ type: "ADD_EXPENSE", payload: { expense } });
+  useEffect(() => {
+      document.title = "Expense Tracker App";
+  }, []);
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, "expenses"), (snapshot) => {
+      const fetchedExpenses = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      dispatch({ type: "SET", payload: { expenses: fetchedExpenses } });
+    });
+
+    return () => unsub();
+  }, []);
+
+  const addExpense = async (expense) => {
+    try {
+      await addDoc(collection(db, "expenses"), {
+        text: expense.text,
+        amount: Number(expense.amount),
+      });
+    } catch (error) {
+      console.error("Error adding document:", error);
+    }
   };
 
-  const deleteExpense = (id) => {
+  async function deleteExpense (id){
     dispatch({ type: "REMOVE_EXPENSE", payload: { id } });
+    // You can also delete from Firestore here if desired
+    const docRef = doc(db, "expenses", id);
+    await deleteDoc(docRef);
   };
 
-  const editExpense = (id) =>{
-    dispatch({type:"EDIT_EXPENSE", payload:{id}});
-  }
+  const editExpense = (id) => {
+    dispatch({ type: "EDIT_EXPENSE", payload: { id } });
+  };
 
-  const updateExpense = (expense) => {
-    dispatch({ type: "UPDATE_EXPENSE", payload: { expense } });
+  const updateExpense = async (expense) => {
+    try {
+      const docRef = doc(db, "expenses", expense.id); // 🔑 reference to the specific doc
+      await updateDoc(docRef, {
+        text: expense.text,
+        amount: Number(expense.amount), // 👈 ensure number is stored
+      });
+  
+      dispatch({ type: "UPDATE_EXPENSE", payload: { expense } }); // ✅ still update local state
+    } catch (error) {
+      console.error("Error updating document:", error);
+    }
   };
   
-  // Add dispatch function for updation
+
   return (
     <>
       <h2 className="mainHeading">Expense Tracker</h2>
       <div className="App">
-      <ExpenseForm 
-        addExpense={addExpense} 
-        newExpense={state.newExpense}  
-        updateExpense={updateExpense}
-      />
-
+        <ExpenseForm
+          addExpense={addExpense}
+          newExpense={state.newExpense}
+          updateExpense={updateExpense}
+        />
         <div className="expenseContainer">
           <ExpenseInfo expenses={state.expenses} />
           <ExpenseList
             expenses={state.expenses}
             deleteExpense={deleteExpense}
             editExpense={editExpense}
-            // Pass props to update a transacation
           />
         </div>
       </div>
